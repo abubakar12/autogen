@@ -7,6 +7,7 @@ import socket
 import subprocess as sp
 import time
 from typing import Dict, List, Optional, Tuple, Union
+from autogen import GroupChat,ConversableAgent
 
 import requests
 from termcolor import colored
@@ -407,6 +408,7 @@ Match roles in the role set to each expert in expert set.
             .choices[0]
             .message.content
         )
+        
         agent_name_list = [agent_name.strip().replace(" ", "_") for agent_name in resp_agent_name.split(",")]
         print(f"{agent_name_list} are generated.", flush=True)
 
@@ -686,14 +688,22 @@ Match roles in the role set to each expert in expert set.
         if coding is True:
             print("Adding user console proxy...", flush=True)
             if user_proxy is None:
+                execution_observer = ConversableAgent(
+                        name="execution_observer",
+                        llm_config=default_llm_config,
+                        system_message="You will observe executions from code_executor and all other agents and will ensure that all instructions from planner are properly being followed till end. Carefully observe if code provided by code writing agent(s) is up to the mark and provide feedback. ",
+                    )
+                execution_observer.description="I am the agent who observes every expect of execution , tell whats wrong. I am your go to person for debugging"
+                
                 user_proxy = autogen.UserProxyAgent(
-                    name="Computer_terminal",
+                    name="Code_executor",
                     is_termination_msg=lambda x: x == "TERMINATE" or x == "TERMINATE.",
                     code_execution_config=code_execution_config,
                     human_input_mode="NEVER",
                     default_auto_reply=self.DEFAULT_PROXY_AUTO_REPLY,
                 )
-            agent_list = agent_list + [user_proxy]
+                user_proxy.description="I am the agent to execute code . Call me every time you want to execute the code written by programming agent(s)"
+            agent_list = agent_list + [user_proxy]+[execution_observer]
 
         return agent_list, self.cached_configs.copy()
 
